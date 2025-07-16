@@ -1,0 +1,825 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { Plus, Edit, Trash2, Printer, XCircle, QrCode, Search, CalendarDays } from 'lucide-react'; // Using lucide-react for icons
+
+// Main App Component
+const App = () => {
+  // State to store the list of equipment
+  const [equipmentList, setEquipmentList] = useState([]);
+  // State for the form data
+  const [formData, setFormData] = useState({
+    id: null, // For editing existing items
+    category: '', // หมวดหมู่
+    name: '', // ชื่ออุปกรณ์
+    serialNumber: '', // หมายเลข
+    model: '', // รุ่นเครื่องมือ
+    assetId: '', // ทะเบียนทรัพย์สิน
+    company: '', // บริษัท
+    status: 'พร้อมใช้งาน', // สถานะ: พร้อมใช้งาน/ชำรุด/ส่งซ่อม
+    image: '', // รูปของเครื่องมือ (Data URL)
+    location: '', // ประจำอยู่ที่ไหน
+    maintenanceDate: '', // maintenance (e.g., 12/3/25-3/3/26)
+    calibrationDate: '', // calibration (e.g., 12/3/25-3/3/26)
+    repairNotes: '', // มีการส่งซ่อมหรือไม่(หมายเหตุ)
+    contactCompany: '', // ติดต่อบริษัท
+    dateRecorded: new Date().toISOString().split('T')[0], // ลงวันที่ (YYYY-MM-DD)
+  });
+
+  // State for search/filter
+  const [searchTerm, setSearchTerm] = useState('');
+  const [filterCategory, setFilterCategory] = useState('');
+  const [filterStatus, setFilterStatus] = useState('');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().toISOString().slice(0, 7)); // YYYY-MM format for monthly overview
+
+  // State for modal visibility
+  const [showImageModal, setShowImageModal] = useState(false);
+  const [modalImageUrl, setModalImageUrl] = useState('');
+  const [modalQrCodeData, setModalQrCodeData] = useState('');
+
+  // Ref for the table to print
+  const tableRef = useRef(null);
+
+  // Categories for the dropdown
+  const categories = [
+    'เครื่องดมยาสลบ',
+    'monitor',
+    'เสาน้ำเกลือ',
+    'srying pump',
+    'เตียง',
+    'เครื่องเจาะ DTX',
+    'emergency car',
+    'laryngoscope',
+  ];
+
+  // Load data from Local Storage on initial render
+  useEffect(() => {
+    try {
+      const storedEquipment = localStorage.getItem('anesthesiaEquipment');
+      if (storedEquipment) {
+        setEquipmentList(JSON.parse(storedEquipment));
+      }
+    } catch (error) {
+      console.error("Failed to load equipment from local storage:", error);
+    }
+  }, []);
+
+  // Save data to Local Storage whenever equipmentList changes
+  useEffect(() => {
+    try {
+      localStorage.setItem('anesthesiaEquipment', JSON.stringify(equipmentList));
+    } catch (error) {
+      console.error("Failed to save equipment to local storage:", error);
+    }
+  }, [equipmentList]);
+
+  // Handle input changes in the form
+  const handleInputChange = (e) => {
+    const { name, value } = e.target;
+    setFormData({ ...formData, [name]: value });
+  };
+
+  // Handle image file upload
+  const handleImageUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setFormData({ ...formData, image: reader.result }); // Store image as Data URL
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  // Handle form submission (add new or update existing)
+  const handleSubmit = (e) => {
+    e.preventDefault();
+    if (!formData.name || !formData.category || !formData.serialNumber) {
+      // Replaced alert with a simple console log for demonstration, consider a custom modal for user feedback
+      console.warn('กรุณากรอกชื่ออุปกรณ์ หมวดหมู่ และหมายเลขซีเรียล');
+      return;
+    }
+
+    if (formData.id) {
+      // Update existing item
+      setEquipmentList(
+        equipmentList.map((item) =>
+          item.id === formData.id ? { ...formData, dateRecorded: new Date().toISOString().split('T')[0] } : item
+        )
+      );
+    } else {
+      // Add new item
+      const newItem = { ...formData, id: Date.now(), dateRecorded: new Date().toISOString().split('T')[0] };
+      setEquipmentList([...equipmentList, newItem]);
+    }
+    // Reset form
+    setFormData({
+      id: null,
+      category: '',
+      name: '',
+      serialNumber: '',
+      model: '',
+      assetId: '',
+      company: '',
+      status: 'พร้อมใช้งาน',
+      image: '',
+      location: '',
+      maintenanceDate: '',
+      calibrationDate: '',
+      repairNotes: '',
+      contactCompany: '',
+      dateRecorded: new Date().toISOString().split('T')[0],
+    });
+  };
+
+  // Set form data for editing an item
+  const handleEdit = (item) => {
+    setFormData(item);
+    // Scroll to the top of the form for easier editing
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  // Delete an item
+  const handleDelete = (id) => {
+    // Replaced window.confirm with a simple console log for demonstration, consider a custom modal for user confirmation
+    if (window.confirm('คุณแน่ใจหรือไม่ที่จะลบรายการนี้?')) {
+      setEquipmentList(equipmentList.filter((item) => item.id !== id));
+    }
+  };
+
+  // Generate QR Code data (simulated, can be expanded with a library)
+  const generateQRCodeData = (item) => {
+    return `ชื่อ: ${item.name}\nซีเรียล: ${item.serialNumber}\nสถานะ: ${item.status}\nประจำที่: ${item.location}`;
+  };
+
+  // Open image modal
+  const openImageModal = (imageUrl) => {
+    setModalImageUrl(imageUrl);
+    setShowImageModal(true);
+  };
+
+  // Open QR code modal
+  const openQrCodeModal = (item) => {
+    setModalQrCodeData(generateQRCodeData(item));
+    setShowImageModal(true); // Reuse image modal for QR code display (simple text for now)
+  };
+
+  // Close modal
+  const closeModal = () => {
+    setShowImageModal(false);
+    setModalImageUrl('');
+    setModalQrCodeData('');
+  };
+
+  // Get overall summary counts
+  const getOverview = () => {
+    const total = equipmentList.length;
+    const ready = equipmentList.filter((item) => item.status === 'พร้อมใช้งาน').length;
+    const damaged = equipmentList.filter((item) => item.status === 'ชำรุด').length;
+    const underRepair = equipmentList.filter((item) => item.status === 'ส่งซ่อม').length;
+    return { total, ready, damaged, underRepair };
+  };
+
+  const { total, ready, damaged, underRepair } = getOverview();
+
+  // Filtered equipment list based on search term, category, and status
+  const filteredEquipment = equipmentList.filter((item) => {
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.serialNumber.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.assetId.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      item.location.toLowerCase().includes(searchTerm.toLowerCase());
+    const matchesCategory = filterCategory === '' || item.category === filterCategory;
+    const matchesStatus = filterStatus === '' || item.status === filterStatus;
+    return matchesSearch && matchesCategory && matchesStatus;
+  });
+
+  // Get monthly overview data
+  const getMonthlyOverview = () => {
+    const monthlyData = {};
+    equipmentList.forEach(item => {
+      const month = item.dateRecorded.slice(0, 7); // YYYY-MM
+      if (!monthlyData[month]) {
+        monthlyData[month] = { total: 0, ready: 0, damaged: 0, underRepair: 0 };
+      }
+      monthlyData[month].total++;
+      if (item.status === 'พร้อมใช้งาน') monthlyData[month].ready++;
+      if (item.status === 'ชำรุด') monthlyData[month].damaged++;
+      if (item.status === 'ส่งซ่อม') monthlyData[month].underRepair++;
+    });
+    return monthlyData;
+  };
+
+  const monthlyOverviewData = getMonthlyOverview();
+
+  // Handle print functionality
+  const handlePrint = () => {
+    const printContent = tableRef.current.innerHTML;
+    const originalContent = document.body.innerHTML;
+    document.body.innerHTML = `
+      <div class="p-8">
+        <h1 class="text-2xl font-bold mb-4">รายงานอุปกรณ์แผนกวิสัญญี</h1>
+        <div class="mb-6">
+          <h2 class="text-xl font-semibold mb-2">ภาพรวมสถานะอุปกรณ์ทั้งหมด</h2>
+          <div class="grid grid-cols-4 gap-4 text-center">
+            <div class="p-4 bg-blue-100 rounded-lg shadow">
+              <p class="text-lg font-bold">รวมทั้งหมด</p>
+              <p class="text-2xl">${total}</p>
+            </div>
+            <div class="p-4 bg-green-100 rounded-lg shadow">
+              <p class="text-lg font-bold">พร้อมใช้งาน</p>
+              <p class="text-2xl">${ready}</p>
+            </div>
+            <div class="p-4 bg-red-100 rounded-lg shadow">
+              <p class="text-lg font-bold">ชำรุด</p>
+              <p class="text-2xl">${damaged}</p>
+            </div>
+            <div class="p-4 bg-yellow-100 rounded-lg shadow">
+              <p class="text-lg font-bold">ส่งซ่อม</p>
+              <p class="text-2xl">${underRepair}</p>
+            </div>
+          </div>
+        </div>
+        <h2 class="text-xl font-semibold mb-2">รายการอุปกรณ์</h2>
+        ${printContent}
+      </div>
+    `;
+    window.print();
+    document.body.innerHTML = originalContent; // Restore original content after printing
+    window.location.reload(); // Reload to ensure all event listeners are reattached
+  };
+
+
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 p-4 font-inter">
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap');
+        body { font-family: 'Inter', sans-serif; }
+        @media print {
+          body * {
+            visibility: hidden;
+          }
+          body {
+            background-color: #fff; /* Ensure white background for printing */
+          }
+          .printable-area, .printable-area * {
+            visibility: visible;
+          }
+          .printable-area {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+          }
+        }
+      `}</style>
+      <header className="bg-gradient-to-r from-blue-700 to-indigo-800 text-white p-8 rounded-3xl shadow-2xl mb-10 transform hover:scale-102 transition-transform duration-300 ease-in-out">
+        <h1 className="text-5xl font-extrabold text-center tracking-tight drop-shadow-lg">
+          ระบบตรวจเช็คสต็อกอุปกรณ์แผนกวิสัญญี
+        </h1>
+        <p className="text-center text-blue-200 mt-3 text-xl italic">
+          Anesthesia Department Equipment Stock Management
+        </p>
+      </header>
+
+      {/* Overview Section */}
+      <section className="bg-white p-8 rounded-3xl shadow-xl mb-10 border border-blue-200">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">ภาพรวมสถานะอุปกรณ์ทั้งหมด</h2>
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 text-center">
+          <div className="p-6 bg-blue-50 rounded-2xl shadow-md border border-blue-300 transform hover:scale-105 transition-transform duration-200">
+            <p className="text-xl font-semibold text-blue-800">รวมทั้งหมด</p>
+            <p className="text-4xl font-extrabold text-blue-900 mt-2">{total}</p>
+          </div>
+          <div className="p-6 bg-green-50 rounded-2xl shadow-md border border-green-300 transform hover:scale-105 transition-transform duration-200">
+            <p className="text-xl font-semibold text-green-800">พร้อมใช้งาน</p>
+            <p className="text-4xl font-extrabold text-green-900 mt-2">{ready}</p>
+          </div>
+          <div className="p-6 bg-red-50 rounded-2xl shadow-md border border-red-300 transform hover:scale-105 transition-transform duration-200">
+            <p className="text-xl font-semibold text-red-800">ชำรุด</p>
+            <p className="text-4xl font-extrabold text-red-900 mt-2">{damaged}</p>
+          </div>
+          <div className="p-6 bg-yellow-50 rounded-2xl shadow-md border border-yellow-300 transform hover:scale-105 transition-transform duration-200">
+            <p className="text-xl font-semibold text-yellow-800">ส่งซ่อม</p>
+            <p className="text-4xl font-extrabold text-yellow-900 mt-2">{underRepair}</p>
+          </div>
+        </div>
+
+        {/* Monthly Overview */}
+        <div className="mt-10 p-6 bg-gray-50 rounded-2xl border border-gray-200 shadow-inner">
+          <h3 className="text-2xl font-bold text-gray-800 mb-5 flex items-center justify-center">
+            <CalendarDays className="mr-3 text-indigo-600" size={24} /> ภาพรวมรายเดือน
+          </h3>
+          <div className="mb-6 text-center">
+            <label htmlFor="selectedMonth" className="block text-lg font-medium text-gray-700 mb-2">
+              เลือกเดือน:
+            </label>
+            <input
+              type="month"
+              id="selectedMonth"
+              name="selectedMonth"
+              value={selectedMonth}
+              onChange={(e) => setSelectedMonth(e.target.value)}
+              className="mt-1 inline-block w-auto p-3 border border-gray-300 rounded-lg shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-white text-lg"
+            />
+          </div>
+          <div className="bg-white p-5 rounded-xl border border-gray-100 shadow-sm">
+            {monthlyOverviewData[selectedMonth] ? (
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4 text-center">
+                <div className="p-4 bg-blue-100 rounded-lg">
+                  <p className="text-lg font-semibold text-blue-800">รวม</p>
+                  <p className="text-3xl font-bold text-blue-900">{monthlyOverviewData[selectedMonth].total}</p>
+                </div>
+                <div className="p-4 bg-green-100 rounded-lg">
+                  <p className="text-lg font-semibold text-green-800">พร้อมใช้งาน</p>
+                  <p className="text-3xl font-bold text-green-900">{monthlyOverviewData[selectedMonth].ready}</p>
+                </div>
+                <div className="p-4 bg-red-100 rounded-lg">
+                  <p className="text-lg font-semibold text-red-800">ชำรุด</p>
+                  <p className="text-3xl font-bold text-red-900">{monthlyOverviewData[selectedMonth].damaged}</p>
+                </div>
+                <div className="p-4 bg-yellow-100 rounded-lg">
+                  <p className="text-lg font-semibold text-yellow-800">ส่งซ่อม</p>
+                  <p className="text-3xl font-bold text-yellow-900">{monthlyOverviewData[selectedMonth].underRepair}</p>
+                </div>
+              </div>
+            ) : (
+              <p className="text-gray-600 text-center text-lg py-4">ไม่มีข้อมูลสำหรับเดือนที่เลือก</p>
+            )}
+          </div>
+        </div>
+      </section>
+
+      {/* Equipment Form Section */}
+      <section className="bg-white p-8 rounded-3xl shadow-xl mb-10 border border-purple-200">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">
+          {formData.id ? 'แก้ไขข้อมูลอุปกรณ์' : 'เพิ่มอุปกรณ์ใหม่'}
+        </h2>
+        <form onSubmit={handleSubmit} className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {/* Category */}
+          <div>
+            <label htmlFor="category" className="block text-sm font-medium text-gray-700 mb-1">
+              หมวดหมู่ <span className="text-red-500">*</span>
+            </label>
+            <select
+              id="category"
+              name="category"
+              value={formData.category}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-base"
+            >
+              <option value="">เลือกหมวดหมู่</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* Name */}
+          <div>
+            <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
+              ชื่ออุปกรณ์ <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="name"
+              name="name"
+              value={formData.name}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น เครื่องดมยาสลบ Dräger Fabius GS"
+            />
+          </div>
+
+          {/* Serial Number */}
+          <div>
+            <label htmlFor="serialNumber" className="block text-sm font-medium text-gray-700 mb-1">
+              หมายเลขซีเรียล <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="text"
+              id="serialNumber"
+              name="serialNumber"
+              value={formData.serialNumber}
+              onChange={handleInputChange}
+              required
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น SN123456789"
+            />
+          </div>
+
+          {/* Model */}
+          <div>
+            <label htmlFor="model" className="block text-sm font-medium text-gray-700 mb-1">
+              รุ่นเครื่องมือ
+            </label>
+            <input
+              type="text"
+              id="model"
+              name="model"
+              value={formData.model}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น Fabius GS"
+            />
+          </div>
+
+          {/* Asset ID */}
+          <div>
+            <label htmlFor="assetId" className="block text-sm font-medium text-gray-700 mb-1">
+              ทะเบียนทรัพย์สิน
+            </label>
+            <input
+              type="text"
+              id="assetId"
+              name="assetId"
+              value={formData.assetId}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น ANES-001"
+            />
+          </div>
+
+          {/* Company */}
+          <div>
+            <label htmlFor="company" className="block text-sm font-medium text-gray-700 mb-1">
+              บริษัท
+            </label>
+            <input
+              type="text"
+              id="company"
+              name="company"
+              value={formData.company}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น Dräger Medical"
+            />
+          </div>
+
+          {/* Status */}
+          <div>
+            <label htmlFor="status" className="block text-sm font-medium text-gray-700 mb-1">
+              สถานะ
+            </label>
+            <select
+              id="status"
+              name="status"
+              value={formData.status}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-base"
+            >
+              <option value="พร้อมใช้งาน">พร้อมใช้งาน</option>
+              <option value="ชำรุด">ชำรุด</option>
+              <option value="ส่งซ่อม">ส่งซ่อม</option>
+            </select>
+          </div>
+
+          {/* Location */}
+          <div>
+            <label htmlFor="location" className="block text-sm font-medium text-gray-700 mb-1">
+              ประจำอยู่ที่ไหน
+            </label>
+            <input
+              type="text"
+              id="location"
+              name="location"
+              value={formData.location}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น ห้องผ่าตัด 1"
+            />
+          </div>
+
+          {/* Maintenance Date */}
+          <div>
+            <label htmlFor="maintenanceDate" className="block text-sm font-medium text-gray-700 mb-1">
+              ช่วงเวลา Maintenance
+            </label>
+            <input
+              type="text"
+              id="maintenanceDate"
+              name="maintenanceDate"
+              value={formData.maintenanceDate}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น 12/3/25-3/3/26"
+            />
+          </div>
+
+          {/* Calibration Date */}
+          <div>
+            <label htmlFor="calibrationDate" className="block text-sm font-medium text-gray-700 mb-1">
+              ช่วงเวลา Calibration
+            </label>
+            <input
+              type="text"
+              id="calibrationDate"
+              name="calibrationDate"
+              value={formData.calibrationDate}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น 12/3/25-3/3/26"
+            />
+          </div>
+
+          {/* Repair Notes */}
+          <div>
+            <label htmlFor="repairNotes" className="block text-sm font-medium text-gray-700 mb-1">
+              มีการส่งซ่อมหรือไม่ (หมายเหตุ)
+            </label>
+            <textarea
+              id="repairNotes"
+              name="repairNotes"
+              value={formData.repairNotes}
+              onChange={handleInputChange}
+              rows="3"
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น ส่งซ่อมจอแสดงผลเมื่อ 1/1/25"
+            ></textarea>
+          </div>
+
+          {/* Contact Company */}
+          <div>
+            <label htmlFor="contactCompany" className="block text-sm font-medium text-gray-700 mb-1">
+              ติดต่อบริษัท
+            </label>
+            <input
+              type="text"
+              id="contactCompany"
+              name="contactCompany"
+              value={formData.contactCompany}
+              onChange={handleInputChange}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+              placeholder="เช่น คุณสมชาย โทร 081-234-5678"
+            />
+          </div>
+
+          {/* Image Upload */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-3">
+            <label htmlFor="image" className="block text-sm font-medium text-gray-700 mb-1">
+              รูปของเครื่องมือ
+            </label>
+            <input
+              type="file"
+              id="image"
+              name="image"
+              accept="image/*"
+              onChange={handleImageUpload}
+              className="mt-1 block w-full text-base text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-100 file:text-blue-700 hover:file:bg-blue-200 cursor-pointer"
+            />
+            {formData.image && (
+              <div className="mt-4 flex items-center space-x-4 p-3 bg-gray-50 rounded-lg shadow-inner">
+                <img src={formData.image} alt="Equipment Preview" className="w-28 h-28 object-cover rounded-xl shadow-md border border-gray-200" />
+                <button
+                  type="button"
+                  onClick={() => setFormData({ ...formData, image: '' })}
+                  className="text-red-600 hover:text-red-800 text-base font-medium flex items-center transition-colors duration-200"
+                >
+                  <XCircle size={20} className="mr-1" /> ลบรูปภาพ
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Submit Button */}
+          <div className="col-span-1 md:col-span-2 lg:col-span-3 flex justify-center space-x-6 mt-8">
+            <button
+              type="submit"
+              className="bg-gradient-to-r from-blue-600 to-indigo-700 hover:from-blue-700 hover:to-indigo-800 text-white font-bold py-4 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 flex items-center text-lg focus:outline-none focus:ring-4 focus:ring-blue-300"
+            >
+              <Plus size={24} className="mr-3" />
+              {formData.id ? 'บันทึกการแก้ไข' : 'เพิ่มอุปกรณ์'}
+            </button>
+            {formData.id && (
+              <button
+                type="button"
+                onClick={() => setFormData({
+                  id: null, category: '', name: '', serialNumber: '', model: '', assetId: '', company: '', status: 'พร้อมใช้งาน', image: '', location: '', maintenanceDate: '', calibrationDate: '', repairNotes: '', contactCompany: '', dateRecorded: new Date().toISOString().split('T')[0]
+                })}
+                className="bg-gray-300 hover:bg-gray-400 text-gray-800 font-bold py-4 px-8 rounded-full shadow-lg transform transition duration-300 hover:scale-105 flex items-center text-lg focus:outline-none focus:ring-4 focus:ring-gray-200"
+              >
+                <XCircle size={24} className="mr-3" />
+                ยกเลิก
+              </button>
+            )}
+          </div>
+        </form>
+      </section>
+
+      {/* Filter and Search Section */}
+      <section className="bg-white p-8 rounded-3xl shadow-xl mb-10 border border-green-200">
+        <h2 className="text-3xl font-bold text-gray-800 mb-6 text-center">ค้นหาและกรองอุปกรณ์</h2>
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+          <div>
+            <label htmlFor="searchTerm" className="block text-sm font-medium text-gray-700 mb-1">
+              ค้นหา (ชื่อ, ซีเรียล, ทะเบียน, ที่ตั้ง)
+            </label>
+            <div className="relative">
+              <input
+                type="text"
+                id="searchTerm"
+                name="searchTerm"
+                value={searchTerm}
+                onChange={(e) => setSearchTerm(e.target.value)}
+                className="mt-1 block w-full p-3 pl-12 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 text-base"
+                placeholder="ค้นหาอุปกรณ์..."
+              />
+              <Search className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-400" size={20} />
+            </div>
+          </div>
+          <div>
+            <label htmlFor="filterCategory" className="block text-sm font-medium text-gray-700 mb-1">
+              กรองตามหมวดหมู่
+            </label>
+            <select
+              id="filterCategory"
+              name="filterCategory"
+              value={filterCategory}
+              onChange={(e) => setFilterCategory(e.target.value)}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-base"
+            >
+              <option value="">ทั้งหมด</option>
+              {categories.map((cat) => (
+                <option key={cat} value={cat}>
+                  {cat}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
+            <label htmlFor="filterStatus" className="block text-sm font-medium text-gray-700 mb-1">
+              กรองตามสถานะ
+            </label>
+            <select
+              id="filterStatus"
+              name="filterStatus"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+              className="mt-1 block w-full p-3 border border-gray-300 rounded-xl shadow-sm focus:ring-blue-500 focus:border-blue-500 bg-gray-50 text-base"
+            >
+              <option value="">ทั้งหมด</option>
+              <option value="พร้อมใช้งาน">พร้อมใช้งาน</option>
+              <option value="ชำรุด">ชำรุด</option>
+              <option value="ส่งซ่อม">ส่งซ่อม</option>
+            </select>
+          </div>
+        </div>
+      </section>
+
+      {/* Equipment List Table */}
+      <section className="bg-white p-8 rounded-3xl shadow-xl mb-10 overflow-x-auto border border-orange-200">
+        <div className="flex flex-col md:flex-row justify-between items-center mb-6">
+          <h2 className="text-3xl font-bold text-gray-800 mb-4 md:mb-0">รายการอุปกรณ์ทั้งหมด ({filteredEquipment.length} รายการ)</h2>
+          <button
+            onClick={handlePrint}
+            className="bg-gradient-to-r from-indigo-600 to-purple-700 hover:from-indigo-700 hover:to-purple-800 text-white font-bold py-3 px-6 rounded-full shadow-lg transform transition duration-300 hover:scale-105 flex items-center text-lg focus:outline-none focus:ring-4 focus:ring-indigo-300"
+          >
+            <Printer size={24} className="mr-3" /> พิมพ์รายงาน
+          </button>
+        </div>
+
+        <div ref={tableRef} className="printable-area">
+          <table className="min-w-full divide-y divide-gray-200 rounded-2xl overflow-hidden shadow-md border border-gray-100">
+            <thead className="bg-gray-100">
+              <tr>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">รูป</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">QR Code</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">หมวดหมู่</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ชื่ออุปกรณ์</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">หมายเลขซีเรียล</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">รุ่นเครื่องมือ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ทะเบียนทรัพย์สิน</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">บริษัท</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">สถานะ</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ประจำที่</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Maintenance</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">Calibration</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ส่งซ่อม (หมายเหตุ)</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ติดต่อบริษัท</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">ลงวันที่</th>
+                <th className="px-4 py-3 text-left text-xs font-semibold text-gray-600 uppercase tracking-wider">การดำเนินการ</th>
+              </tr>
+            </thead>
+            <tbody className="bg-white divide-y divide-gray-100">
+              {filteredEquipment.length === 0 ? (
+                <tr>
+                  <td colSpan="16" className="px-4 py-6 whitespace-nowrap text-center text-gray-500 text-lg">
+                    ไม่พบข้อมูลอุปกรณ์
+                  </td>
+                </tr>
+              ) : (
+                filteredEquipment.map((item, index) => (
+                  <tr key={item.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      {item.image ? (
+                        <img
+                          src={item.image}
+                          alt={item.name}
+                          className="w-20 h-20 object-cover rounded-lg cursor-pointer shadow-sm border border-gray-200 hover:shadow-md transition-shadow duration-200"
+                          onClick={() => openImageModal(item.image)}
+                          title="คลิกเพื่อดูรูปภาพ"
+                        />
+                      ) : (
+                        <div className="w-20 h-20 bg-gray-200 rounded-lg flex items-center justify-center text-gray-500 text-xs shadow-sm">
+                          ไม่มีรูป
+                        </div>
+                      )}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <button
+                        onClick={() => openQrCodeModal(item)}
+                        className="text-blue-600 hover:text-blue-800 flex items-center text-sm font-medium hover:underline transition-colors duration-200"
+                        title="คลิกเพื่อดู QR Code"
+                      >
+                        <QrCode size={20} className="mr-1" /> ดู QR
+                      </button>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.category}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{item.name}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.serialNumber}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.model}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.assetId}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.company}</td>
+                    <td className="px-4 py-4 whitespace-nowrap">
+                      <span
+                        className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full shadow-sm
+                          ${item.status === 'พร้อมใช้งาน' ? 'bg-green-100 text-green-800' : ''}
+                          ${item.status === 'ชำรุด' ? 'bg-red-100 text-red-800' : ''}
+                          ${item.status === 'ส่งซ่อม' ? 'bg-yellow-100 text-yellow-800' : ''}
+                        `}
+                      >
+                        {item.status}
+                      </span>
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.location}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.maintenanceDate}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.calibrationDate}</td>
+                    <td className="px-4 py-4 text-sm text-gray-800 max-w-xs overflow-hidden text-ellipsis">
+                      {item.repairNotes}
+                    </td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.contactCompany}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-800">{item.dateRecorded}</td>
+                    <td className="px-4 py-4 whitespace-nowrap text-right text-sm font-medium">
+                      <button
+                        onClick={() => handleEdit(item)}
+                        className="text-indigo-600 hover:text-indigo-900 mr-3 flex items-center hover:underline transition-colors duration-200"
+                        title="แก้ไข"
+                      >
+                        <Edit size={18} className="mr-1" /> แก้ไข
+                      </button>
+                      <button
+                        onClick={() => handleDelete(item.id)}
+                        className="text-red-600 hover:text-red-900 flex items-center mt-2 hover:underline transition-colors duration-200"
+                        title="ลบ"
+                      >
+                        <Trash2 size={18} className="mr-1" /> ลบ
+                      </button>
+                    </td>
+                  </tr>
+                ))
+              )}
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      {/* Image/QR Code Modal */}
+      {showImageModal && (
+        <div className="fixed inset-0 bg-gray-900 bg-opacity-80 flex items-center justify-center z-50 p-4 animate-fade-in">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 relative max-w-xl w-full transform scale-95 animate-zoom-in">
+            <button
+              onClick={closeModal}
+              className="absolute top-4 right-4 text-gray-500 hover:text-gray-800 transition-colors duration-200"
+            >
+              <XCircle size={30} />
+            </button>
+            {modalImageUrl && (
+              <>
+                <h3 className="text-2xl font-bold mb-5 text-gray-800 text-center">รูปภาพอุปกรณ์</h3>
+                <img src={modalImageUrl} alt="Equipment" className="max-w-full h-auto rounded-xl shadow-lg mx-auto" />
+              </>
+            )}
+            {modalQrCodeData && (
+              <>
+                <h3 className="text-2xl font-bold mb-5 text-gray-800 text-center">ข้อมูล QR Code</h3>
+                <pre className="bg-gray-100 p-5 rounded-xl text-base text-gray-800 whitespace-pre-wrap break-words border border-gray-200">
+                  {modalQrCodeData}
+                </pre>
+                <p className="text-sm text-gray-600 mt-3 text-center">
+                  (นี่คือการจำลองข้อมูล QR Code หากต้องการสร้าง QR Code จริงต้องใช้ไลบรารีเพิ่มเติม)
+                </p>
+              </>
+            )}
+          </div>
+        </div>
+      )}
+
+      <footer className="text-center text-gray-600 mt-12 pb-6 text-sm">
+        &copy; {new Date().getFullYear()} Anesthesia Department Equipment Manager. All rights reserved.
+      </footer>
+    </div>
+  );
+};
+
+export default App;
